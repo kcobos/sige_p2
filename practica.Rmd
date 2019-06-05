@@ -1,0 +1,168 @@
+<!--
+## -------------------------------------------------------------------------------------
+## Sistemas Inteligentes para la Gestión en la Empresa
+## Curso 2018-2019
+## Carlos Cobos Suárez, Adrián Morente Gabaldón
+## Práctica 2: Deep Learning para multi-clasificación
+## -------------------------------------------------------------------------------------
+-->
+
+Definición de las carpetas de trabajo
+```{r echo=FALSE}
+library(keras)
+#setwd("~/Desktop/practica2") # o donde sea
+train_dir      <- './train/'
+validation_dir <- './validation/' 
+test_dir       <- './test/'
+```
+
+Como se nos ha dado sólamente el conjunto de entrenamiento correctamente etiquetado, repartimos los datos de este conjunto en validación y test también. De esta manera, la red no va a ser capaz de ver los datos de test hasta su momento.
+```{r echo=FALSE}
+separaDatos <- function(carpeta_entrada, carpeta_salida, porcentaje = 0.2, borrar_entrada=TRUE) {
+  if (!dir.exists(carpeta_salida))
+    dir.create(carpeta_salida)
+  
+  clases<-list.dirs(path = carpeta_entrada, full.names = FALSE)
+  
+  for (clase in clases){
+    if(clase != "") {
+      carpeta_clase_entrada <- paste(carpeta_entrada,clase,sep = "/")
+      carpeta_clase_salida <- paste(carpeta_salida,clase,sep = "/")
+      if (!dir.exists(carpeta_clase_salida))
+        dir.create(carpeta_clase_salida)
+      
+      todos <- list.files(path = carpeta_clase_entrada)
+      a_copiar <- sample(todos, length(todos)*porcentaje)
+      
+      for (fichero in a_copiar){
+        file.copy(paste(carpeta_clase_entrada, fichero, sep = "/"), carpeta_clase_salida)
+        if (borrar_entrada)
+          file.remove(paste(carpeta_clase_entrada, fichero, sep = "/"))
+      }
+    }
+  }
+}
+
+#Para hacer pruebas en el PC, vamos a coger el 20% de los datos.
+separaDatos("./train_images/", train_dir, 1, FALSE)
+
+separaDatos(train_dir, validation_dir, 0.3)
+separaDatos(train_dir, test_dir, 0.3)
+```
+
+Prueba con el código de dog_cats del profesor. Algunas cosas importantes se han cambiado y debidamente comentado.
+```{r}
+# https://tensorflow.rstudio.com/keras/reference/image_data_generator.html 
+train_datagen      <- image_data_generator(rescale = 1/255) 
+validation_datagen <- image_data_generator(rescale = 1/255)
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+# https://tensorflow.rstudio.com/keras/reference/flow_images_from_directory.html
+train_data <- flow_images_from_directory(
+  directory = train_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),   # (w, h) --> (150, 150)
+  batch_size = 50,             # grupos de 50 imágenes
+  class_mode = "categorical"   # tenemos 5 categorías #"binary"        # etiquetas binarias
+)
+
+validation_data <- flow_images_from_directory(
+  directory = validation_dir,
+  generator = validation_datagen,
+  target_size = c(150, 150),   # (w, h) --> (150, 150)
+  batch_size = 50,             # grupos de 50 imágenes
+  class_mode = "categorical"   # tenemos 5 categorías
+)
+
+test_data <- flow_images_from_directory(
+  directory = test_dir,
+  generator = test_datagen,
+  target_size = c(150, 150),   # (w, h) --> (150, 150)
+  batch_size = 50,             # grupos de 50 imágenes
+  class_mode = "categorical"   # tenemos 5 categorías
+)
+
+## -------------------------------------------------------------------------------------
+## Crear modelo
+
+# Definir arquitectura
+# https://tensorflow.rstudio.com/keras/articles/sequential_model.html
+model <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  layer_dense(units = 5, activation = "sigmoid") # 5 unidades de salida, una por categoría
+
+summary(model)
+
+# Compilar modelo
+# https://tensorflow.rstudio.com/keras/reference/compile.html
+model %>% compile(
+  loss = "categorical_crossentropy", # Tiene que ser categórico, tenemos 5 clases
+  optimizer = optimizer_rmsprop(lr = 1e-4),
+  metrics = c("accuracy")
+)
+
+# Entrenamiento
+# https://tensorflow.rstudio.com/keras/reference/fit_generator.html
+history <- model %>% 
+  fit_generator(
+    train_data,
+    steps_per_epoch = 100,
+    epochs = 15,
+    validation_data = validation_data,
+    validation_steps = 50
+  )
+
+# Evaluar modelo
+# https://tensorflow.rstudio.com/keras/reference/evaluate_generator.html
+model %>% evaluate_generator(test_data, steps = 25)
+
+# Guardar modelo (HDF5)
+# https://tensorflow.rstudio.com/keras/reference/save_model_hdf5.html
+# model %>% save_model_hdf5("petfinder_v1.h5")
+
+# Visualizar entrenamiento
+plot(history)
+
+## -------------------------------------------------------------------------------------
+## Data augmentation
+# 
+# # https://tensorflow.rstudio.com/keras/reference/image_data_generator.html
+# data_augmentation_datagen <- image_data_generator(
+#   rescale = 1/255,
+#   rotation_range = 40,
+#   width_shift_range = 0.2,
+#   height_shift_range = 0.2,
+#   shear_range = 0.2,
+#   zoom_range = 0.2,
+#   horizontal_flip = TRUE,
+#   fill_mode = "nearest"
+# )
+# 
+# train_augmented_data <- flow_images_from_directory(
+#   directory = train_dir,
+#   generator = data_augmentation_datagen,  # ¡usando nuevo datagen!
+#   target_size = c(150, 150),   # (w, h) --> (150, 150)
+#   batch_size = 20,             # grupos de 20 imágenes
+#   class_mode = "binary"        # etiquetas binarias
+# )
+# 
+# history <- model %>% 
+#   fit_generator(
+#     train_augmented_data,
+#     steps_per_epoch = 100,
+#     epochs = 15,
+#     validation_data = validation_data,
+#     validation_steps = 50
+#   )
+# 
+# model %>% save_model_hdf5("dogsVScats_augmentation.h5")
+
+model %>% evaluate_generator(test_data, steps = 50)
+```
+
