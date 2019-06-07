@@ -17,12 +17,14 @@ test_dir       <- './test/'
 ```
 
 Como se nos ha dado sólamente el conjunto de entrenamiento correctamente etiquetado, repartimos los datos de este conjunto en validación y test también. De esta manera, la red no va a ser capaz de ver los datos de test hasta su momento.
+
+Hay que dividir también el CSV con los mismos datos con los que se dividen las carpetas de imágenes
 ```{r echo=FALSE}
 separaDatos <- function(carpeta_entrada, carpeta_salida, porcentaje = 0.2, borrar_entrada=TRUE) {
   if (!dir.exists(carpeta_salida))
     dir.create(carpeta_salida)
   
-  clases<-list.dirs(path = carpeta_entrada, full.names = FALSE)
+  clases <- list.dirs(path = carpeta_entrada, full.names = FALSE)
   
   for (clase in clases){
     if(clase != "") {
@@ -43,17 +45,60 @@ separaDatos <- function(carpeta_entrada, carpeta_salida, porcentaje = 0.2, borra
   }
 }
 
-#Para hacer pruebas en el PC, vamos a coger el 20% de los datos.
+set.seed(333.857)
 separaDatos("./train_images/", train_dir, 1, FALSE)
 
-separaDatos(train_dir, validation_dir, 0.3)
-separaDatos(train_dir, test_dir, 0.3)
+separaDatos(train_dir, test_dir, 0.2)
+separaDatos(train_dir, validation_dir, 0.2)
 ```
 
+Histograma
+Falta meterle color y agrupar las barritas estaría bien
+```{r}
+cuentaDatos <- function(carpeta_entrada) {
+  clases <- list.dirs(path = carpeta_entrada, full.names = FALSE)
+  num <- rep(0, length(clases)-1)
+  cl = 1
+  for (clase in clases){
+    if(clase != "") {
+      carpeta_clase_entrada <- paste(carpeta_entrada,clase,sep = "/")
+      
+      todos <- list.files(path = carpeta_clase_entrada)
+      num[cl] <- length(todos)
+      cl <- cl + 1
+    }
+  }
+  data.frame(num, "clase"=c("0","1","2","3","4"))
+}
+
+library(ggplot2)
+conteoDatos <- data.frame(
+  "num"=c(cuentaDatos(train_dir)$num, cuentaDatos(validation_dir)$num, cuentaDatos(test_dir)$num), 
+  "conjunto"=c(rep("train",5),rep("validation",5),rep("test",5)),
+  "clases" = rep(c(0,1,2,3,4),3)
+  )
+
+barplot(conteoDatos$num, names.arg=conteoDatos$clases)
+
+```
+
+
 Prueba con el código de dog_cats del profesor. Algunas cosas importantes se han cambiado y debidamente comentado.
+Lo suyo sería coger un porcentaje de los datos para comparar los distintos modelos y así quue no tarde mucho.
+
+Modelos:
+ * Sin nada = 0.2873636
+ * Sin balanceo, con 1 = 0.2819
+ * Sin balanceo, con 1 y 2 = 0.2819
+ * Con data augmentation = 0.2831818
+ * Con data augmentation y balanceo = 0.2582727
+ * Red para probar http://cbonnett.github.io/Insight.html
+
+Una vez que sepamos qué tipo de red va mejor, a esa se le pasan todos los datos
+
 ```{r}
 # https://tensorflow.rstudio.com/keras/reference/image_data_generator.html 
-train_datagen      <- image_data_generator(rescale = 1/255) 
+train_datagen      <- image_data_generator(rescale = 1/255) #, horizontal_flip = TRUE, vertical_flip = TRUE, rotation_range = 30) 
 validation_datagen <- image_data_generator(rescale = 1/255)
 test_datagen       <- image_data_generator(rescale = 1/255)
 
@@ -63,7 +108,8 @@ train_data <- flow_images_from_directory(
   generator = train_datagen,
   target_size = c(150, 150),   # (w, h) --> (150, 150)
   batch_size = 50,             # grupos de 50 imágenes
-  class_mode = "categorical"   # tenemos 5 categorías #"binary"        # etiquetas binarias
+  class_mode = "categorical",   # tenemos 5 categorías #"binary"        # etiquetas binarias
+  seed = 333.857
 )
 
 validation_data <- flow_images_from_directory(
@@ -71,7 +117,8 @@ validation_data <- flow_images_from_directory(
   generator = validation_datagen,
   target_size = c(150, 150),   # (w, h) --> (150, 150)
   batch_size = 50,             # grupos de 50 imágenes
-  class_mode = "categorical"   # tenemos 5 categorías
+  class_mode = "categorical",   # tenemos 5 categorías
+  seed = 333.857
 )
 
 test_data <- flow_images_from_directory(
@@ -79,7 +126,8 @@ test_data <- flow_images_from_directory(
   generator = test_datagen,
   target_size = c(150, 150),   # (w, h) --> (150, 150)
   batch_size = 50,             # grupos de 50 imágenes
-  class_mode = "categorical"   # tenemos 5 categorías
+  class_mode = "categorical",   # tenemos 5 categorías
+  seed = 333.857
 )
 
 ## -------------------------------------------------------------------------------------
@@ -90,11 +138,24 @@ test_data <- flow_images_from_directory(
 model <- keras_model_sequential() %>%
   layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
   layer_max_pooling_2d(pool_size = c(2, 2)) %>%
-  layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% layer_max_pooling_2d(pool_size = c(2, 2)) %>%
-  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% layer_max_pooling_2d(pool_size = c(2, 2)) %>%
-  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  # Red tradicional
   layer_flatten() %>%
   layer_dense(units = 512, activation = "relu") %>%
+  # # 1
+  # layer_dropout(rate = 0.15) %>% 
+  # layer_dense(units = 256, activation = "relu") %>%
+  # # 2
+  # layer_dropout(rate = 0.15) %>% 
+  # layer_dense(units = 128, activation = "relu") %>%
+  
+  # Capa de salida
   layer_dense(units = 5, activation = "sigmoid") # 5 unidades de salida, una por categoría
 
 summary(model)
@@ -104,7 +165,7 @@ summary(model)
 model %>% compile(
   loss = "categorical_crossentropy", # Tiene que ser categórico, tenemos 5 clases
   optimizer = optimizer_rmsprop(lr = 1e-4),
-  metrics = c("accuracy")
+  metrics = c("categorical_accuracy")
 )
 
 # Entrenamiento
@@ -112,15 +173,23 @@ model %>% compile(
 history <- model %>% 
   fit_generator(
     train_data,
-    steps_per_epoch = 100,
+    steps_per_epoch = 50,
     epochs = 15,
     validation_data = validation_data,
-    validation_steps = 50
+    validation_steps = 100,
+    #class_weight = list("0"=10,"1"=1.1,"2"=0.84,"3"=1,"4"=1) # Balanceo de clases
   )
 
 # Evaluar modelo
 # https://tensorflow.rstudio.com/keras/reference/evaluate_generator.html
-model %>% evaluate_generator(test_data, steps = 25)
+model %>% evaluate_generator(test_data, steps = 220)
+
+# Sin nada = 0.2873636
+# Sin balanceo, con 1 = 0.2819
+# Sin balanceo, con 1 y 2 = 0.2819
+# Con data augmentation = 0.2831818
+# Con data augmentation y balanceo = 0.2582727
+
 
 # Guardar modelo (HDF5)
 # https://tensorflow.rstudio.com/keras/reference/save_model_hdf5.html
@@ -128,41 +197,27 @@ model %>% evaluate_generator(test_data, steps = 25)
 
 # Visualizar entrenamiento
 plot(history)
+```
 
-## -------------------------------------------------------------------------------------
-## Data augmentation
-# 
-# # https://tensorflow.rstudio.com/keras/reference/image_data_generator.html
-# data_augmentation_datagen <- image_data_generator(
-#   rescale = 1/255,
-#   rotation_range = 40,
-#   width_shift_range = 0.2,
-#   height_shift_range = 0.2,
-#   shear_range = 0.2,
-#   zoom_range = 0.2,
-#   horizontal_flip = TRUE,
-#   fill_mode = "nearest"
-# )
-# 
-# train_augmented_data <- flow_images_from_directory(
-#   directory = train_dir,
-#   generator = data_augmentation_datagen,  # ¡usando nuevo datagen!
-#   target_size = c(150, 150),   # (w, h) --> (150, 150)
-#   batch_size = 20,             # grupos de 20 imágenes
-#   class_mode = "binary"        # etiquetas binarias
-# )
-# 
-# history <- model %>% 
-#   fit_generator(
-#     train_augmented_data,
-#     steps_per_epoch = 100,
-#     epochs = 15,
-#     validation_data = validation_data,
-#     validation_steps = 50
-#   )
-# 
-# model %>% save_model_hdf5("dogsVScats_augmentation.h5")
 
-model %>% evaluate_generator(test_data, steps = 50)
+Red para el CSV
+https://www.tensorflow.org/alpha/tutorials/keras/feature_columns
+Hay que hacer una red aparte
+https://www.pyimagesearch.com/2019/02/04/keras-multiple-inputs-and-mixed-data/
+```{r}
+library(readr)
+train <- read_csv("train.csv")
+
+library(tibble)
+library(dplyr)
+
+column_names <- colnames(train)
+train_df <- as_tibble(train)
+colnames(train_df) <- column_names
+
+y = train_df %>% select(PetID, AdoptionSpeed)
+train_df = select(train_df,-c(AdoptionSpeed, PhotoAmt))
+
+
 ```
 
