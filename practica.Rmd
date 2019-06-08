@@ -9,17 +9,16 @@
 
 Definición de las carpetas de trabajo
 ```{r echo=FALSE}
-library(keras)
-#setwd("~/Desktop/practica2") # o donde sea
+remove(list = ls())
+setwd("~/Desktop/practica2") # o donde sea
+images_origin  <- './train_images'
 train_dir      <- './train/'
-validation_dir <- './validation/' 
+# validation_dir <- './validation/' 
 test_dir       <- './test/'
 ```
 
-Como se nos ha dado sólamente el conjunto de entrenamiento correctamente etiquetado, repartimos los datos de este conjunto en validación y test también. De esta manera, la red no va a ser capaz de ver los datos de test hasta su momento.
-
-Hay que dividir también el CSV con los mismos datos con los que se dividen las carpetas de imágenes
-```{r echo=FALSE}
+Función para crear subconjuntos con las imágenes
+```{r}
 separaDatos <- function(carpeta_entrada, carpeta_salida, porcentaje = 0.2, borrar_entrada=TRUE) {
   if (!dir.exists(carpeta_salida))
     dir.create(carpeta_salida)
@@ -45,15 +44,9 @@ separaDatos <- function(carpeta_entrada, carpeta_salida, porcentaje = 0.2, borra
   }
 }
 
-set.seed(333.857)
-separaDatos("./train_images/", train_dir, 1, FALSE)
-
-separaDatos(train_dir, test_dir, 0.2)
-separaDatos(train_dir, validation_dir, 0.2)
 ```
 
-Histograma
-Falta meterle color y agrupar las barritas estaría bien
+Función para contabilizar las imágenes de cada clase
 ```{r}
 cuentaDatos <- function(carpeta_entrada) {
   clases <- list.dirs(path = carpeta_entrada, full.names = FALSE)
@@ -70,17 +63,142 @@ cuentaDatos <- function(carpeta_entrada) {
   }
   data.frame(num, "clase"=c("0","1","2","3","4"))
 }
+```
 
+Análisis previo de los datos
+```{r}
 library(ggplot2)
-conteoDatos <- data.frame(
-  "num"=c(cuentaDatos(train_dir)$num, cuentaDatos(validation_dir)$num, cuentaDatos(test_dir)$num), 
-  "conjunto"=c(rep("train",5),rep("validation",5),rep("test",5)),
-  "clases" = rep(c(0,1,2,3,4),3)
+conteo_dataset_original <- cuentaDatos(images_origin)
+bp_dataset_original <- ggplot(data=conteo_dataset_original, aes(x=clase, y=num)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=num), vjust=-0.3, size=3.5)+
+  theme_minimal()
+ggsave("barplot_original.svg",bp_dataset_original, device = "svg")
+bp_dataset_original
+```
+
+Como no tenemos un conjunto de prueba para verificar el funcionamiento de la red neuronal, vamos a sacar del conjunto de entrenamiento un subconjunto estratificado para test, es decir, respetando la proporción de las clases.
+```{r}
+set.seed(333.857)
+separaDatos(images_origin, train_dir, 1, FALSE) # Se copian todos los datos de train
+separaDatos(train_dir, test_dir, 0.2)           # De dicho train, se coge el 20% para test
+# separaDatos(train_dir, validation_dir, 0.2)     # Del train se vuelve a coger el 20% para v
+
+conteo_particionado <- data.frame(
+  "num"=c(cuentaDatos(train_dir)$num, cuentaDatos(test_dir)$num), 
+  "conjunto"=c(rep("train",5),rep("test",5)),
+  "clases" = rep(c(0,1,2,3,4),2)
   )
 
-barplot(conteoDatos$num, names.arg=conteoDatos$clases)
+barplot(conteo_particionado$num, names.arg=conteo_particionado$clases)
+
+bp_dataset_particionado <- ggplot(data=conteo_particionado, aes(x=clases, y=num, fill=conjunto)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_text(aes(label=num), vjust=-0.3,
+            position = position_dodge(0.9), size=3.5)+
+  scale_fill_brewer(palette="Paired")+
+  theme_minimal()
+ggsave("bp_dataset_particionado.svg",bp_dataset_particionado, device = "svg")
+bp_dataset_particionado
 
 ```
+
+Como se puede apreciar, hay un desbalanceo muy considerable de los datos, sobretodo en la clase 0 donde a penas hay.
+Una vez se ha analizado superficialmente los datos del dataset, cabe indicar que sólamente con las imágenes no se puede clasificar correctamente a los animales en las clases de adopción.
+
+Es hora de probar diversas configuraciones de redes para intentar clasificar a los animales. Para que no demore mucho, optamos por utilizar solo el 50% de losd datos. Para poder comparar los diferentes modelos, se van a usar la función de pérdida *categorical_crossentropy* y la de precisión *categorical_accuracy*. Una vez que se sepa qué configuración de red va mejor, se le pasará el conjunto de datos entero.
+
+```{r}
+train_50_dir      <- './train50/'
+test_50_dir       <- './test50/'
+
+separaDatos(train_dir, train_50_dir, 0.5, FALSE)
+separaDatos(test_dir, test_50_dir, 0.5, F)
+library(keras)
+```
+
+Primer modelo: Ejemplo dogs_cats visto en clase pero modificado para clasificación categórica:
+```{r}
+# Leer de datos
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2)
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+train_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='training',
+  seed = 333.857
+)
+validation_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='validation',
+  seed = 333.857
+)
+test_data <- flow_images_from_directory(
+  directory = test_50_dir,
+  generator = test_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  seed = 333.857
+)
+
+# Definir arquitectura
+model <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  # Red tradicional
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  
+  # Capa de salida
+  layer_dense(units = 5, activation = "sigmoid") # 5 unidades de salida, una por categoría
+
+summary(model)
+
+# Compilar modelo
+model %>% compile(
+  loss = "categorical_crossentropy", # Tiene que ser categórico, tenemos 5 clases
+  optimizer = optimizer_rmsprop(lr = 1e-4),
+  metrics = c("categorical_accuracy")
+)
+
+# Entrenamiento
+history <- model %>% 
+  fit_generator(
+    train_data,
+    steps_per_epoch = 50,
+    epochs = 15,
+    validation_data = validation_data,
+    validation_steps = 100
+  )
+
+# Evaluar modelo
+model %>% evaluate_generator(test_data, steps = 220)
+# $loss
+# [1] 1.449931
+# 
+# $categorical_accuracy
+# [1] 0.2842959
+
+# Visualizar entrenamiento
+plot(history)
+```
+
 
 
 Prueba con el código de dog_cats del profesor. Algunas cosas importantes se han cambiado y debidamente comentado.
