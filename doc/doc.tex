@@ -1,0 +1,66 @@
+\documentclass[]{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\hypersetup{
+	colorlinks   = true,
+	citecolor    = gray,
+	urlcolor     = darkgray,
+	linkcolor	 = darkgray
+}
+
+%opening
+\title{Sistemas Inteligentes para la Gestión en la Empresa\\-\\Práctica 2: Deep Learning para multi-clasificación}
+\author{Carlos Cobos Suárez\\Adrián Morente Gabaldón}
+
+\begin{document}
+
+\maketitle
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introducción}
+
+En este proyecto vamos a realizar diversas aproximaciones al tratamiento de técnicas de \textbf{aprendizaje automático} con el lenguaje \textbf{\textit{R}}. Tras ponernos en situación con los fundamentos teóricos necesarios para entender el desarrollo realizado, comentaremos las soluciones pensadas y las que finalmente se hayan implementado; realizando después una discusión de los resultados obtenidos.\\
+
+El conjunto de datos (o \textit{dataset}) que utilizaremos se corresponde con el de \textbf{\textit{PetFinder.my Adoption Prediction}}, y podemos encontrarlo en la plataforma \href{https://kaggle.com}{Kaggle} \cite{petfinder-dataset}. Los datos contenidos clasifican un histórico de perros y gatos alojados en centros de adopción de animales, con diversas características y almacenando el \textbf{tiempo de adopción} de cada una de estas mascotas.\\
+
+El trabajo a desarrollar en este proyecto versa sobre el \textbf{entrenamiento de modelos de predicción} que, a partir de imágenes o de un conjunto de características de animales, clasifiquen éstos por tiempo de adopción. Utilizaremos \textbf{cinco categorías} (las cuales se ordenan según el tiempo de adopción en orden ascendente).\\
+
+Dado que para el entrenamiento se dispone de un gran conjunto de datos ya clasificado, realizaremos algún \textbf{histograma}, lo que trata de un gráfico de barras que muestra el cardinal del conjunto de datos de cada una de las distintas categorías mencionadas.
+
+\section{Fundamentos teóricos}
+
+	\subsection{\textit{Deep Learning}}
+	
+		\subsubsection{Modelos de clasificación}
+		
+		\subsubsection{Redes neuronales}
+		
+		\subsubsection{Redes convolucionales}
+		
+		\subsubsection{Técnicas de binarización}
+		
+		\subsubsection{\textit{Ensembles}}
+
+\section{Descripción de las redes empleadas}
+
+	\subsection{Primera aproximación - Red vista en clase}
+	
+	\subsection{Segunda aproximación - Balanceo de clases}
+	
+	\subsection{Tercera aproximación - \textit{Data augmentation}}
+	
+\section{Discusión de resultados}
+
+\section{Conclusiones}
+
+\bibliographystyle{plain}
+\bibliography{sources}
+
+\end{document}
