@@ -65,6 +65,8 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 	
 		Como podemos observar en dicha figura \ref{neural-network}, la red consta de una capa de entrada con dos neuronas, una red intermedia con otras dos, y finalmente de la capa de salida. Debemos saber que en dicha capa intermedia es donde se realizan sobre los datos de entrada todas las operaciones matemáticas que comentábamos anteriormente.\\
 		
+		Además, ha de destacarse que la conexión entre las neuronas de la red viene determinada por unos \textbf{pesos numéricos característicos}. Estos pesos son los que se utilizan a la hora de hacer el cálculo de salida final, dando una mayor importancia a ciertas neuronas con respecto a otras.\\
+		
 		Finalmente, en la capa de salida se combinan como entradas las salidas de la capa intermedia para, mediante una \textbf{función de activación}, producir una determinada salida.
 		
 	\subsection{Redes neuronales para tratamiento de imágenes}
@@ -111,7 +113,7 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 		
 		La diferencia principal entre una red neuronal simple y las redes de \textit{aprendizaje profundo} reside en que las primeras, como ya hemos visto anteriormente, contienen una suma de tres capas: la de \textbf{entrada}, la \textbf{intermedia} (donde se aplican las operaciones) y la de \textbf{salida}.\\
 		
-		Por otro lado, en las redes neuronales de \textit{deep learning} el número de capas intermedias es mayor, con lo que se consigue un mejor aprendizaje. Esto se debe a que el número de neuronas (y por tanto de pesos en el modelo final) es mayor; y cuanto más alto sea el número de hiperparámetros presentes en un algoritmo, mayor es la capacidad de entrenamiento que tendrá dicho modelo final.
+		Por otro lado, en las redes neuronales de \textit{deep learning} el número de capas intermedias es mayor, con lo que se consigue un mejor aprendizaje. Esto se debe a que el número de neuronas (y por tanto de pesos en el modelo final) es mayor; y cuanto más alto sea el número de hiperparámetros presentes en un algoritmo, mayor es la capacidad de entrenamiento que tendrá dicho modelo final.\\
 		
 		\begin{figure}[h]
 			\centering
@@ -120,9 +122,23 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 			\label{nn-differences}
 		\end{figure}
 	
+		\subsubsection*{Clasificación categórica}
+		
+			La finalidad de cualquier técnica de clasificación (o \textit{clustering}) es lógicamente asignar una clase concreta a cada una de las entradas. Esta clasificación podría ser \textbf{binaria} (si existen tan solo dos clases) o \textbf{multicategórica} (si existen más de dos).\\
+			
+			El problema de las clasificaciones multicategóricas es que pueden no detectar demasiado bien las características de cada clase y el modelo resultante puede errar con alta frecuencia en sus predicciones. Este problema también se evidencia con la existencia de un desequilibrio en el número de datos de cada clase encontrados en la fase de entrenamiento.\\
+			
+			Una forma de intentar poner solución a este problema es el uso de \textit{técnicas de binarización}, las cuales comentaremos en el apartado siguiente.
+	
 		las clasificaciones multicategóricas fallan porque no suelen detectar muy bien las clases. esto se puede resolver si nos llevamos ese mismo problema a varios más sencillos de clasificación binaria, obteniendo así más clasificadores.
 	
 		\subsubsection{Técnicas de binarización}
+		
+			Surgen como técnica basada en la descomposición de un problema en otros de menor dimensión, de forma que en un problema de \textit{clustering}, no encontramos más de dos clases a la vez (clasificación binaria).\\
+			
+			...\\
+			
+			Como podría esperarse, al obtener varios clasificadores en lugar de uno solo, surge la necesidad de unir (o fusionar) de alguna forma todos los modelos generados, para así obtener únicamente uno teóricamente más eficaz. Veamos una de estas técnicas en el siguiente apartado.
 		
 		\subsubsection{\textit{Ensembles}}
 		
