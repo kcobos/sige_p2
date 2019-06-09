@@ -1,4 +1,4 @@
-\documentclass[]{scrartcl}
+\documentclass[]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[spanish]{babel}
 \usepackage{graphicx}
@@ -130,31 +130,89 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 			
 			Una forma de intentar poner solución a este problema es el uso de \textit{técnicas de binarización}, las cuales comentaremos en el apartado siguiente.
 	
-		las clasificaciones multicategóricas fallan porque no suelen detectar muy bien las clases. esto se puede resolver si nos llevamos ese mismo problema a varios más sencillos de clasificación binaria, obteniendo así más clasificadores.
-	
 		\subsubsection{Técnicas de binarización}
 		
-			Surgen como técnica basada en la descomposición de un problema en otros de menor dimensión, de forma que en un problema de \textit{clustering}, no encontramos más de dos clases a la vez (clasificación binaria).\\
+			Al igual que en los métodos del tipo \verb|"divide y vencerás"|, surgen como técnica basada en la descomposición de un problema en otros de menor dimensión, de forma que en un problema de \textit{clustering}, no encontramos más de dos clases a la vez (clasificación binaria). Como podría esperarse, surge la necesidad de combinar las distintas salidas de cada uno de los nuevos clasificadores para así realizar la predicción final de clase (lo que se conoce como \textbf{agregación}). Veremos las técnicas de agregación más adelante.\\
 			
-			...\\
+			Según podemos ver en la referencia \cite{binary-classifiers}, artículo escrito por un grupo de investigación de profesores de nuestra propia facultad, existen dos técnicas de binarización principales: \textit{\textbf{One-vs-One}} y \textit{\textbf{One-vs-All}}, que describimos a continuación:\\
 			
-			Como podría esperarse, al obtener varios clasificadores en lugar de uno solo, surge la necesidad de unir (o fusionar) de alguna forma todos los modelos generados, para así obtener únicamente uno teóricamente más eficaz. Veamos una de estas técnicas en el siguiente apartado.
+			{\large \textbf{\textit{One-vs-One}}}: Se basa en el uso de un clasificador binario para discriminar entre un par de clases. El conjunto de datos utilizado para entrenamiento es el subconjunto del \textit{dataset} donde se encuentra asignada una de las dos clases, ignorando así los datos que pertenecen a las otras categorías.\\
+			
+			La clase de salida suele decidirse por algún modelo basado en votación, donde cada clasificador vota por una clase preferida y la asignada finalmente es aquella con mayor número de votos.\\
+			
+			{\large \textbf{\textit{One-vs-All}}}: Se reduce el problema a tantos problemas binarios como clases existan, donde en cada uno de ellos se realiza el enfrentamiento entre una sola clase y el grupo de categorías compuesto por el resto.\\
+			
+			En este caso los datos de entrenamiento usados se corresponden con los del \textit{dataset} completo, considerando de la categoría \textit{positiva} los de la clase única, y como \textit{negativa} los del resto.\\
+			
+			Como ya adelantábamos, una vez que disponemos de distintos clasificadores que resuelven problemas más pequeños, se requiere de una gestión de las múltiples salidas para su integración en una sola etiqueta, es decir, la categoría decidida finalmente para la entrada inicial. Pasemos por tanto a comentar las técnicas de agregación que ponen solución a esto.
+			
+		\subsubsection{Técnicas de agregación \textit{Ensembles}}
 		
-		\subsubsection{\textit{Ensembles}}
+			Como venimos adelantando, consisten en la integración de múltiples salidas de pequeños clasificadores para la decisión de una sola. Como mencionan en la referencia \cite{ensembling-methods}, un ejemplo sería el de un proceso de contratación para un demandante de empleo, donde la decisión final de su incorporación reside en el acuerdo entre todos los entrevistadores.\\
+			
+			Podemos encontrar distintos tipos, entre los que destacamos los siguientes:
+			
+			\begin{itemize}
+				\item \textbf{Estrategia basada en votación}: es quizá la más sencilla. Cada clasificador vota por una categoría, se realiza un recuento y aquella clase que haya recibido más votos es la decidida finalmente por el modelo para la entrada dada.
+				\item \textbf{Estrategia basada en votación con pesos}: sigue la idea anterior pero en este caso cada clasificador asigna una clase con un determinado peso, en función de la confianza que tiene en dicha predicción.
+			\end{itemize}
 		
-			forma de juntar todos los clasificadores binarios para tener un solo modelo final.
+\section{Descripción de las redes empleadas - Práctica 2}
 
-\section{Descripción de las redes empleadas}
+	cogemos imágenes (sin csv) 
 
 	\subsection{Primera aproximación - Red vista en clase}
 	
+		\begin{figure}[h]
+			\centering
+			\includegraphics[width=0.8\textwidth]{./img/model1}
+			\caption{}
+			\label{}
+		\end{figure}
+	
 	\subsection{Segunda aproximación - Balanceo de clases}
+	
+		\begin{figure}[h]
+			\centering
+			\includegraphics[width=0.8\textwidth]{./img/model2}
+			\caption{}
+			\label{}
+		\end{figure}
 	
 	funciona con pesos. como tenemos los datos del histograma, podemos sacar los porcentajes (pesos) a utilizar para que estén balanceados con el resto de clases.
 	
 	\subsection{Tercera aproximación - \textit{Data augmentation}}
 	
+		\begin{figure}[h]
+			\centering
+			\includegraphics[width=0.8\textwidth]{./img/model3}
+			\caption{}
+			\label{}
+		\end{figure}
+	
 \section{Discusión de resultados}
+
+\section{Trabajo de investigación}
+
+	\subsection{OVO sin balancear}
+	
+	\begin{table}[h]
+		\begin{tabular}{lllllllllll}
+			& 01 & 02 & 03 & 04 & 12 & 13 & 14 & 23 & 24 & 34 \\
+			loss & 0.3481829 & 0.2762300 & 0.2932069 & 0.2874075 & 0.7930871 & 0.8128870 & 0.8359219 & 0.9399353 & 0.7924052 & 0.8011671 \\
+			acc & 0.8943279 & 0.9235526 & 0.9165143 & 0.9136690 & 0.5286328 & 0.5557229 & 0.5829403 & 0.5247777 & 0.5625824 & 0.5524499
+		\end{tabular}
+	\end{table}
+	
+	\subsection{OVO balanceado}
+	
+	\begin{table}[h]
+		\begin{tabular}{lllllllllll}
+			& 01 & 02 & 03 & 04 & 12 & 13 & 14 & 23 & 24 & 34 \\
+			loss & 0.5259883 & 0.5165291 & 0.5786227 & 0.5641954 & 0.8058108 & 0.7883038 & 0.7757325 & 0.8466508 & 0.7972207 & 0.7887562 \\
+			acc & 0.7373737 & 0.7223159 & 0.6776356 & 0.6932636 & 0.5340014 & 0.5481928 & 0.5636792 & 0.5266836 & 0.5635705 & 0.5572809
+		\end{tabular}
+	\end{table}
 
 \section{Conclusiones}
 
