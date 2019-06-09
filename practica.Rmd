@@ -456,6 +456,8 @@ for (dosClases in gruposOVO) {
   plot(history)
   dev.off()
   
+  plot(history)
+  
   ptn <- data.frame("pun"=unlist(puntuacionDC))
   names(ptn) <- paste(unlist(dosClases), sep = "", collapse = "")
   puntuacionOVO <- cbind(puntuacionOVO, ptn)
@@ -572,6 +574,250 @@ for (dosClases in gruposOVO) {
 puntuacionOVO_bal <- puntuacionOVO_bal[,-1]
 puntuacionOVO_bal
 ```
+
+Creación OVA:
+```{r}
+# Crear carpetas
+creaCarpetasOVA <- function(carpeta_train, carpeta_test, clase){
+  for (carpeta_entrada in c(carpeta_train, carpeta_test)){
+    carpeta_salida <- paste0(substr(carpeta_entrada,3,nchar(carpeta_entrada)-1),"_OVA_", clase)
+    dir.create(carpeta_salida)
+    
+    clases <- list.dirs(path = carpeta_entrada, full.names = FALSE)
+  
+    for (cl in clases){
+      if(cl != "") {
+        carpeta_clase_entrada <- paste(carpeta_entrada,cl,sep = "/")
+        if (cl != clase){
+          carpeta_clase_salida <- paste(carpeta_salida,"A",sep = "/")
+        } else {
+          carpeta_clase_salida <- paste(carpeta_salida,cl,sep = "/")
+        }
+        if (!dir.exists(carpeta_clase_salida))
+          dir.create(carpeta_clase_salida)
+         
+          
+        todos <- list.files(path = carpeta_clase_entrada)
+        
+        for (fichero in todos){
+          file.copy(paste(carpeta_clase_entrada, fichero, sep = "/"), carpeta_clase_salida)
+        }
+      }
+    }
+  }
+}
+
+for (clase in 0:4)
+  creaCarpetasOVA(train_50_dir, test_50_dir,clase)
+
+testOVA <- paste0("test50_OVA_",0:4)
+trainOVA <- paste0("train50_OVA_",0:4)
+```
+
+OVA sin balancear:
+```{r}
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2) 
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+gruposOVA = list(c("0","A"), c("1", "A"), c("2","A"), c("3","A"), c("4","A"))
+puntuacionOVA = data.frame("NA"=c(1,1), row.names = c("loss","acc"))
+
+for (indice in 1:5) {
+  print(paste("OVA",indice))
+  train_data <- flow_images_from_directory(
+    directory = trainOVA[indice],
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='training',
+    seed = 333.857
+  )
+  validation_data <- flow_images_from_directory(
+    directory = trainOVA[indice],
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='validation',
+    seed = 333.857
+  )
+  test_data <- flow_images_from_directory(
+    directory = testOVA[indice],
+    generator = test_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    seed = 333.857
+  )
+  
+  # Definir arquitectura
+  model <- keras_model_sequential() %>%
+    layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    
+    # Red tradicional
+    layer_flatten() %>%
+    layer_dense(units = 512, activation = "relu") %>%
+    
+    # Capa de salida
+    layer_dense(units = 1, activation = "sigmoid") # 5 unidades de salida, una por categoría
+  
+  summary(model)
+  
+  # Compilar modelo
+  model %>% compile(
+    loss = "binary_crossentropy",
+    optimizer = optimizer_rmsprop(lr = 1e-4),
+    metrics = c("accuracy")
+  )
+  
+  # Entrenamiento
+  history <- model %>% 
+    fit_generator(
+      train_data,
+      steps_per_epoch = 30,
+      epochs = 15,
+      validation_data = validation_data,
+      validation_steps = 100
+    )
+  
+  # Evaluar modelo
+  puntuacionDC <- model %>% evaluate_generator(test_data, steps = 100)
+  
+  model %>% save_model_hdf5(paste("petfinder_ova_",paste(unlist(dosClases), sep = "", collapse = ""),".h5", sep = ""))
+  
+  png(paste("ova_",paste(unlist(dosClases), sep = "", collapse = ""),".png", sep = ""))
+  plot(history)
+  dev.off()
+  
+  plot(history)
+  
+  ptn <- data.frame("pun"=unlist(puntuacionDC))
+  names(ptn) <- paste(unlist(dosClases), sep = "", collapse = "")
+  puntuacionOVA <- cbind(puntuacionOVA, ptn)
+}
+
+puntuacionOVA <- puntuacionOVA[,-1]
+puntuacionOVA
+```
+
+OVA balanceado:
+```{r}
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2) 
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+puntuacionOVA_bal = data.frame("NA"=c(1,1), row.names = c("loss","acc"))
+
+for (indice in 1:5) {
+  print(paste("OVA balanceado", indice))
+  train_data <- flow_images_from_directory(
+    directory = trainOVA[indice],
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='training',
+    seed = 333.857
+  )
+  validation_data <- flow_images_from_directory(
+    directory = trainOVA[indice],
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='validation',
+    seed = 333.857
+  )
+  test_data <- flow_images_from_directory(
+    directory = testOVA[indice],
+    generator = test_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    seed = 333.857
+  )
+  
+  # Definir arquitectura
+  model <- keras_model_sequential() %>%
+    layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    
+    # Red tradicional
+    layer_flatten() %>%
+    layer_dense(units = 512, activation = "relu") %>%
+    
+    # Capa de salida
+    layer_dense(units = 1, activation = "sigmoid") # 5 unidades de salida, una por categoría
+  
+  summary(model)
+  
+  # Compilar modelo
+  model %>% compile(
+    loss = "binary_crossentropy",
+    optimizer = optimizer_rmsprop(lr = 1e-4),
+    metrics = c("accuracy")
+  )
+  
+  # Balancear
+  datos1 <- length(train_data$labels[train_data$labels==0])
+  datos2 <- length(train_data$labels[train_data$labels==1])
+  
+  pesos <- list(datos2/datos1, 1) # Como la clase minoritaria es la primera, se hace oversampling
+  names(pesos) <- c(0, 1)
+  print(pesos)
+  
+  # Entrenamiento
+  history <- model %>% 
+    fit_generator(
+      train_data,
+      steps_per_epoch = 30,
+      epochs = 15,
+      validation_data = validation_data,
+      validation_steps = 100,
+      class_weight = pesos # Balanceo de clases
+    )
+  
+  # Evaluar modelo
+  puntuacionDC <- model %>% evaluate_generator(test_data, steps = 100)
+  
+  model %>% save_model_hdf5(paste("petfinder_ova_bal_",paste(unlist(dosClases), sep = "", collapse = ""),".h5", sep = ""))
+  
+  png(paste("ova_",paste(unlist(dosClases), sep = "", collapse = ""),".png", sep = ""))
+  plot(history)
+  dev.off()
+  
+  plot(history)
+  
+  ptn <- data.frame("pun"=unlist(puntuacionDC))
+  names(ptn) <- paste(unlist(dosClases), sep = "", collapse = "")
+  puntuacionOVA_bal <- cbind(puntuacionOVA_bal, ptn)
+}
+
+puntuacionOVA_bal <- puntuacionOVA_bal[,-1]
+puntuacionOVA_bal
+```
+
+
+
+/*************************************************************************************************/
+/*************************************************************************************************/
+/*************************************************************************************************/
+/*************************************************************************************************/
+/*************************************************************************************************/
+
 
 Prueba con el código de dog_cats del profesor. Algunas cosas importantes se han cambiado y debidamente comentado.
 Lo suyo sería coger un porcentaje de los datos para comparar los distintos modelos y así quue no tarde mucho.
