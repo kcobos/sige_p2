@@ -708,7 +708,7 @@ puntuacionOVA <- puntuacionOVA[,-1]
 puntuacionOVA
 ```
 
-OVA sin balancear:
+OVA balanceado:
 ```{r}
 train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2) 
 test_datagen       <- image_data_generator(rescale = 1/255)
