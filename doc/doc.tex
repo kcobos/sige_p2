@@ -146,7 +146,7 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 			
 			Como ya adelantábamos, una vez que disponemos de distintos clasificadores que resuelven problemas más pequeños, se requiere de una gestión de las múltiples salidas para su integración en una sola etiqueta, es decir, la categoría decidida finalmente para la entrada inicial. Pasemos por tanto a comentar las técnicas de agregación que ponen solución a esto.
 			
-		\subsubsection{Técnicas de agregación \textit{Ensembles}}
+		\subsubsection{Técnicas de agregación (\textit{Ensembles})}
 		
 			Como venimos adelantando, consisten en la integración de múltiples salidas de pequeños clasificadores para la decisión de una sola. Como mencionan en la referencia \cite{ensembling-methods}, un ejemplo sería el de un proceso de contratación para un demandante de empleo, donde la decisión final de su incorporación reside en el acuerdo entre todos los entrevistadores.\\
 			
@@ -155,21 +155,52 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 			\begin{itemize}
 				\item \textbf{Estrategia basada en votación}: es quizá la más sencilla. Cada clasificador vota por una categoría, se realiza un recuento y aquella clase que haya recibido más votos es la decidida finalmente por el modelo para la entrada dada.
 				\item \textbf{Estrategia basada en votación con pesos}: sigue la idea anterior pero en este caso cada clasificador asigna una clase con un determinado peso, en función de la confianza que tiene en dicha predicción.
+				\item \textbf{\textit{Boosting}}: se trata de una técnica secuencial donde el primer algoritmo es entrenado contra el \textit{dataset} completo. Una vez que el algoritmo ha realizado la clasificación, se toman todos los datos que han sido categorizados de forma errónea, y el siguiente algoritmo intenta clasificarlos correctamente. Se repite este comportamiento para los algoritmos subsecuentes.
 			\end{itemize}
+		
+			En nuestro caso, más adelante comentaremos con más detalle la estrategia basada en \textbf{votación con pesos}, que será la que utilicemos para intentar mejorar el rendimiento de nuestro trabajo desarrollado para el apartado de investigación.
 		
 \section{Descripción de las redes empleadas - Práctica 2}
 
-	cogemos imágenes (sin csv) 
+	Una vez que hemos hecho una puesta en contexto de algunas de las técnicas que utilizaremos para el desarrollo del proyecto, es momento de ponernos manos a la obra con la aplicación de redes neuronales de distintos tipos, poniendo en práctica lo aprendido hasta el momento.\\
+	
+	Como mencionamos en la introducción, utilizaremos el \textit{dataset} de predicción de tiempo de adopción de animales; que cargaremos en diferentes tipos de redes neuronales con los distintos \textit{tunings} que apliquemos. Sobre estas redes, utilizaremos distintas métricas que nos guiarán hacia la persecución del mejor resultado que podamos obtener. Respecto a estas métricas, debemos hacer algunas apreciaciones iniciales:\\
+	
+	{\large \textbf{\textit{Accuracy}}}: prestaremos especial atención a este valor, el cual traducimos por \verb|"precisión"|. Este evalúa directamente el porcentaje de aciertos del modelo de predicción con respecto al número de elementos. En las conclusiones realizaremos algunos comentarios al respecto pero, por ahora, quedemos con que un \textbf{clasificador aleatorio} a priori deberá tener un porcentaje de precisión igual a 100 dividido entre el número de clases. Dicho esto, sabremos que en este problema que estamos tratando gozaremos de un \textit{accuracy} inicial del 20\% (100 entre las 5 categorías).\\
+	
+	{\large \textbf{\textit{Loss}}}: se trata de un valor \textit{perjudicial} que pretendemos minimizar al máximo. Cuanto mayor sea, significará que las predicciones se alejan más de lo que sería la clasificación ideal. En el apartado de conclusiones también realizaremos algunas apreciaciones adicionales, pero debemos tener presente que se deben estudiar las dos métricas de forma conjunta.\\
+	
+	Una vez visto esto, pasemos a ver primeramente la red más básica, inspirada en lo aprendido en clase.
 
 	\subsection{Primera aproximación - Red vista en clase}
+	
+		Se utiliza la misma red neuronal vista en las prácticas de la asignatura y accesible desde el repositorio correspondiente del profesor \cite{red-clase}.\\
+	
+		Consta de una arquitectura muy típicamente vista en problemas de reconocimiento de imágenes a través del uso de redes neuronales. La estructura viene dada por la utilización de convoluciones y aplicaciones de \textit{pooling}; que sirve para concentrar en un solo píxel un conjunto cuadrado de estos, y así reducir la dimensión de la matriz estudiada, dado que la aplicación de convoluciones hace que crezca.\\
+		
+		Como en todas las redes que utilizaremos, disponemos de \textbf{cinco neuronas} para la capa de salida (tantas como categorías manejadas).\\
+		
+		En la figura \ref{first-nn} podemos visualizar un gráfico con el resultado del entrenamiento del modelo, junto con la representación de su validación con el conjunto de datos correspondiente.
 	
 		\begin{figure}[h]
 			\centering
 			\includegraphics[width=0.8\textwidth]{./img/model1}
-			\caption{}
-			\label{}
+			\caption{Gráfica resultado del entrenamiento del primer modelo.}
+			\label{first-nn}
 		\end{figure}
 	
+		En dicha figura, para los distintos subconjuntos de datos (entrenamiento y validación), podemos apreciar varias cosas:
+		
+		\begin{itemize}
+			\item Fase de \textbf{entrenamiento}: conforme el número de épocas aumenta, el valor de \textit{accuracy} crece y el de \textit{loss} disminuye. Esto es lo esperado, ya que manifiesta el aprendizaje de la red neuronal sobre los datos presentados en el entrenamiento, aumentando su precisión y disminuyendo el número de errores de predicción.
+			\item Con respecto a la \textbf{validación}: se puede ver claramente que la \textit{precisión} se mantiene constante, mientras que el número de errores crece. Esto evidencia dos cosas: \begin{itemize}
+				\item Los datos aprendidos por la red durante el entrenamiento no tienen correlación alguna con los contenidos en el subconjunto de validación, y por ello no se altera el primer valor.
+				\item El algoritmo está \textit{sobreaprendiendo}; es decir, ajustándose demasiado a los datos aprendidos y no generalizando correctamente sobre aquellos nuevos que no conoce.
+			\end{itemize}
+		\end{itemize}
+	
+		A modo de última apreciación, podemos ver también en dicha figura que el valor de \textit{accuracy} en el conjunto de validación se encuentra en torno a un \textbf{26\%}, valor aproximado al que decíamos que contendría un clasificador aleatorio.
+		
 	\subsection{Segunda aproximación - Balanceo de clases}
 	
 		\begin{figure}[h]
@@ -214,7 +245,23 @@ Por otro lado, realizaremos también un \textbf{trabajo de investigación} relac
 		\end{tabular}
 	\end{table}
 
+	\subsection{OVA sin balancear}
+	
+	\begin{table}[h]
+		\begin{tabular}{llllll}
+			& 0 & 1 & 2 & 3 & 4 \\
+			loss & & 0.5016596 & 0.6651614 & 0.6049633 & 0.5717794 \\
+			acc & & 0.8015738 & 0.6707720 & 0.7248261 & 0.7271069
+		\end{tabular}
+	\end{table}
+				
+
 \section{Conclusiones}
+
+	- el valor de accuracy hay que cogerlo con pinzas.
+	- realmente el carlos está tocao de la cabeza.
+	- las imágenes por sí solas no aportan información suficiente como para la resolución del problema.
+	- ya estaría.
 
 \bibliographystyle{plain}
 \bibliography{sources}
