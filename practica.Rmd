@@ -90,8 +90,6 @@ conteo_particionado <- data.frame(
   "clases" = rep(c(0,1,2,3,4),2)
   )
 
-barplot(conteo_particionado$num, names.arg=conteo_particionado$clases)
-
 bp_dataset_particionado <- ggplot(data=conteo_particionado, aes(x=clases, y=num, fill=conjunto)) +
   geom_bar(stat="identity", position=position_dodge())+
   geom_text(aes(label=num), vjust=-0.3,
@@ -188,7 +186,7 @@ history <- model %>%
   )
 
 # Evaluar modelo
-model %>% evaluate_generator(test_data, steps = 220)
+puntiacion1 <- model %>% evaluate_generator(test_data, steps = 220)
 # $loss
 # [1] 1.449931
 # 
@@ -199,7 +197,381 @@ model %>% evaluate_generator(test_data, steps = 220)
 plot(history)
 ```
 
+Segundo modelo: Balanceo de clases:
+```{r}
+# Leer de datos
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2)
+test_datagen       <- image_data_generator(rescale = 1/255)
 
+train_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='training',
+  seed = 333.857
+)
+validation_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='validation',
+  seed = 333.857
+)
+test_data <- flow_images_from_directory(
+  directory = test_50_dir,
+  generator = test_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  seed = 333.857
+)
+
+# Definir arquitectura
+model <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  # Red tradicional
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  
+  # Capa de salida
+  layer_dense(units = 5, activation = "sigmoid") # 5 unidades de salida, una por categoría
+
+summary(model)
+
+# Compilar modelo
+model %>% compile(
+  loss = "categorical_crossentropy", # Tiene que ser categórico, tenemos 5 clases
+  optimizer = optimizer_rmsprop(lr = 1e-4),
+  metrics = c("categorical_accuracy")
+)
+
+# Entrenamiento
+history <- model %>% 
+  fit_generator(
+    train_data,
+    steps_per_epoch = 50,
+    epochs = 15,
+    validation_data = validation_data,
+    validation_steps = 100,
+    class_weight = list("0"=10,"1"=1.1,"2"=0.84,"3"=1,"4"=1)
+  )
+
+# Evaluar modelo
+puntuacion2 <- model %>% evaluate_generator(test_data, steps = 220)
+
+# $loss
+# [1] 1.665951
+# 
+# $categorical_accuracy
+# [1] 0.2321551
+
+# Visualizar entrenamiento
+plot(history)
+```
+
+Este modelo empeora. Puede ser que sin balancear, el modelo acierte más ya que lleva los datos a las clases mayoritarias.
+Habría que ver la asignación de etiquetas de los modelos.
+
+Tercer modelo: Data augmentation:
+```{r}
+# Leer de datos
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2, horizontal_flip = TRUE, vertical_flip = TRUE, rotation_range = 30) 
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+train_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='training',
+  seed = 333.857
+)
+validation_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='validation',
+  seed = 333.857
+)
+test_data <- flow_images_from_directory(
+  directory = test_50_dir,
+  generator = test_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  seed = 333.857
+)
+
+# Definir arquitectura
+model <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  # Red tradicional
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  
+  # Capa de salida
+  layer_dense(units = 5, activation = "sigmoid") # 5 unidades de salida, una por categoría
+
+summary(model)
+
+# Compilar modelo
+model %>% compile(
+  loss = "categorical_crossentropy", # Tiene que ser categórico, tenemos 5 clases
+  optimizer = optimizer_rmsprop(lr = 1e-4),
+  metrics = c("categorical_accuracy")
+)
+
+# Entrenamiento
+history <- model %>% 
+  fit_generator(
+    train_data,
+    steps_per_epoch = 100,
+    epochs = 15,
+    validation_data = validation_data,
+    validation_steps = 100
+  )
+
+# Evaluar modelo
+puntuacion3 <- model %>% evaluate_generator(test_data, steps = 220)
+
+# $loss
+# [1] 1.454917
+# 
+# $categorical_accuracy
+# [1] 0.2892931
+
+# Visualizar entrenamiento
+plot(history)
+```
+
+
+Técnicas de binarización: OVO
+
+```{r}
+# Definir grupos de OVO
+gruposOVO <- list(c("0","1"),c("0","2"),c("0","3"),c("0","4"),c("1","2"),c("1","3"),c("1","4"),c("2","3"),c("2","4"),c("3","4"))
+
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2) 
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+puntuacionOVO = data.frame("NA"=c(1,1), row.names = c("loss","acc"))
+
+for (dosClases in gruposOVO) {
+  train_data <- flow_images_from_directory(
+    directory = train_50_dir,
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='training',
+    seed = 333.857,
+    classes = unlist(dosClases)
+  )
+  validation_data <- flow_images_from_directory(
+    directory = train_50_dir,
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='validation',
+    seed = 333.857,
+    classes = unlist(dosClases)
+  )
+  test_data <- flow_images_from_directory(
+    directory = test_50_dir,
+    generator = test_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    seed = 333.857,
+    classes = unlist(dosClases)
+  )
+  
+  # Definir arquitectura
+  model <- keras_model_sequential() %>%
+    layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    
+    # Red tradicional
+    layer_flatten() %>%
+    layer_dense(units = 512, activation = "relu") %>%
+    
+    # Capa de salida
+    layer_dense(units = 1, activation = "sigmoid") # 5 unidades de salida, una por categoría
+  
+  summary(model)
+  
+  # Compilar modelo
+  model %>% compile(
+    loss = "binary_crossentropy",
+    optimizer = optimizer_rmsprop(lr = 1e-4),
+    metrics = c("accuracy")
+  )
+  
+  # Entrenamiento
+  history <- model %>% 
+    fit_generator(
+      train_data,
+      steps_per_epoch = 30,
+      epochs = 15,
+      validation_data = validation_data,
+      validation_steps = 100
+    )
+  
+  # Evaluar modelo
+  puntuacionDC <- model %>% evaluate_generator(test_data, steps = 100)
+  
+  model %>% save_model_hdf5(paste("petfinder_ovo_",paste(unlist(dosClases), sep = "", collapse = ""),".h5", sep = ""))
+  
+  png(paste("ovo_",paste(unlist(dosClases), sep = "", collapse = ""),".png", sep = ""))
+  plot(history)
+  dev.off()
+  
+  ptn <- data.frame("pun"=unlist(puntuacionDC))
+  names(ptn) <- paste(unlist(dosClases), sep = "", collapse = "")
+  puntuacionOVO <- cbind(puntuacionOVO, ptn)
+}
+
+puntuacionOVO <- puntuacionOVO[,-1]
+puntuacionOVO
+```
+
+Como se puede ver, la clase 0 con las demás da muy buen resultado debido al desbalanceo tan grande. Las demás prácticamente son clasificadores aleatorios.
+
+Vamos a hacer lo mismo pero balanceando las clases:
+
+```{r}
+
+puntuacionOVO_bal <- data.frame("NA"=c(1,1), row.names = c("loss","acc"))
+
+for (dosClases in gruposOVO) {
+# dosClases <- gruposOVO[2]
+  print(dosClases)
+  
+  train_data <- flow_images_from_directory(
+    directory = train_50_dir,
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='training',
+    seed = 333.857,
+    classes = unlist(dosClases)
+  )
+  validation_data <- flow_images_from_directory(
+    directory = train_50_dir,
+    generator = train_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    subset='validation',
+    seed = 333.857,
+    classes = unlist(dosClases)
+  )
+  test_data <- flow_images_from_directory(
+    directory = test_50_dir,
+    generator = test_datagen,
+    target_size = c(150, 150),
+    batch_size = 50,
+    class_mode = "binary",
+    seed = 333.857,
+    classes = unlist(dosClases)
+  )
+  
+  # Definir arquitectura
+  model <- keras_model_sequential() %>%
+    layer_conv_2d(filters = 32,  kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 64,  kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    
+    # Red tradicional
+    layer_flatten() %>%
+    layer_dense(units = 512, activation = "relu") %>%
+    
+    # Capa de salida
+    layer_dense(units = 1, activation = "sigmoid") # 5 unidades de salida, una por categoría
+  
+  summary(model)
+  
+  # Compilar modelo
+  model %>% compile(
+    loss = "binary_crossentropy",
+    optimizer = optimizer_rmsprop(lr = 1e-4),
+    metrics = c("accuracy")
+  )
+  
+  # Balancear
+  datos1 <- length(train_data$labels[train_data$labels==0])
+  datos2 <- length(train_data$labels[train_data$labels==1])
+  
+  pesos <- list(datos2/datos1, 1) # Como la clase minoritaria es la primera, se hace oversampling
+  names(pesos) <- c(0, 1)
+  print(pesos)
+  
+  # Entrenamiento
+  history <- model %>% 
+    fit_generator(
+      train_data,
+      steps_per_epoch = 30,
+      epochs = 15,
+      validation_data = validation_data,
+      validation_steps = 100,
+      class_weight = pesos # Balanceo de clases
+    )
+  
+  # Evaluar modelo
+  puntuacionDC <- model %>% evaluate_generator(test_data, steps = 100)
+  
+  model %>% save_model_hdf5(paste("petfinder_ovo_bal_",paste(unlist(dosClases), sep = "", collapse = ""),".h5", sep = ""))
+  
+  png(paste("ovo_bal_",paste(unlist(dosClases), sep = "", collapse = ""),".png", sep = ""))
+  plot(history)
+  dev.off()
+  
+  plot(history)
+  
+  ptn <- data.frame("pun"=unlist(puntuacionDC))
+  names(ptn) <- paste(unlist(dosClases), sep = "", collapse = "")
+  puntuacionOVO_bal <- cbind(puntuacionOVO_bal, ptn)
+}
+
+puntuacionOVO_bal <- puntuacionOVO_bal[,-1]
+puntuacionOVO_bal
+```
 
 Prueba con el código de dog_cats del profesor. Algunas cosas importantes se han cambiado y debidamente comentado.
 Lo suyo sería coger un porcentaje de los datos para comparar los distintos modelos y así quue no tarde mucho.
@@ -374,42 +746,41 @@ test_data <- flow_images_from_directory(
 
 # Definir arquitectura
 model <- keras_model_sequential() %>%
-  layer_zero_padding_2d(padding = c(1L, 1L), data_format = c(150, 150, 3)) %>%
-  
+  layer_zero_padding_2d(padding = c(1L, 1L), data_format = c(3,150, 150)) %>%
   layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
-  
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
-  
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
-  
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
-  
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_zero_padding_2d(padding = c(1L, 1L)) %>%
-  layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
-  layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
+  # 
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
+  # 
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
+  # 
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
+  # 
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_zero_padding_2d(padding = c(1L, 1L)) %>%
+  # layer_conv_2d(filters = 512, kernel_size = c(3, 3), activation = "relu") %>%
+  # layer_max_pooling_2d(pool_size = c(2, 2), strides = c(2, 2)) %>%
   
   # Red tradicional
   layer_flatten() %>%
