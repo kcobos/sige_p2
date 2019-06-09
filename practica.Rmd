@@ -793,16 +793,16 @@ for (indice in 1:5) {
   # Evaluar modelo
   puntuacionDC <- model %>% evaluate_generator(test_data, steps = 100)
   
-  model %>% save_model_hdf5(paste("petfinder_ova_bal_",paste(unlist(dosClases), sep = "", collapse = ""),".h5", sep = ""))
+  model %>% save_model_hdf5(paste("petfinder_ova_bal_",indice-1,".h5", sep = ""))
   
-  png(paste("ova_",paste(unlist(dosClases), sep = "", collapse = ""),".png", sep = ""))
+  png(paste("ova_",indice-1,".png", sep = ""))
   plot(history)
   dev.off()
   
   plot(history)
   
   ptn <- data.frame("pun"=unlist(puntuacionDC))
-  names(ptn) <- paste(unlist(dosClases), sep = "", collapse = "")
+  names(ptn) <- indice-1
   puntuacionOVA_bal <- cbind(puntuacionOVA_bal, ptn)
 }
 
@@ -810,6 +810,92 @@ puntuacionOVA_bal <- puntuacionOVA_bal[,-1]
 puntuacionOVA_bal
 ```
 
+
+Ensamble OVO
+```{r}
+model_01 <- load_model_hdf5(filepath = 'petfinder_ovo_01.h5')
+model_02 <- load_model_hdf5(filepath = 'petfinder_ovo_02.h5')
+model_03 <- load_model_hdf5(filepath = 'petfinder_ovo_03.h5')
+model_04 <- load_model_hdf5(filepath = 'petfinder_ovo_04.h5')
+model_12 <- load_model_hdf5(filepath = 'petfinder_ovo_12.h5')
+model_13 <- load_model_hdf5(filepath = 'petfinder_ovo_13.h5')
+model_14 <- load_model_hdf5(filepath = 'petfinder_ovo_14.h5')
+model_23 <- load_model_hdf5(filepath = 'petfinder_ovo_23.h5')
+model_24 <- load_model_hdf5(filepath = 'petfinder_ovo_24.h5')
+model_34 <- load_model_hdf5(filepath = 'petfinder_ovo_34.h5')
+
+# Leer de datos
+train_datagen      <- image_data_generator(rescale = 1/255, validation_split = 0.2) 
+test_datagen       <- image_data_generator(rescale = 1/255)
+
+train_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='training',
+  seed = 333.857
+)
+validation_data <- flow_images_from_directory(
+  directory = train_50_dir,
+  generator = train_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  subset='validation',
+  seed = 333.857
+)
+test_data <- flow_images_from_directory(
+  directory = test_50_dir,
+  generator = test_datagen,
+  target_size = c(150, 150),
+  batch_size = 50,
+  class_mode = "categorical",
+  seed = 333.857
+)
+
+shared_input <- layer_input(shape=(get_input_shape_at(model_01, 1) %>% unlist))
+model_list <- c(model_01(shared_input), model_02(shared_input), model_03(shared_input), model_04(shared_input), model_12(shared_input), model_13(shared_input), model_14(shared_input), model_23(shared_input), model_24(shared_input), model_34(shared_input))
+main_output  <- layer_average(model_list)
+model <- keras_model(
+  inputs = c(shared_input), 
+  
+  outputs = c(main_output, layer_dense(units = 5, activation = "sigmoid"))
+)
+
+summary(model)
+
+# Compilar modelo
+model %>% compile(
+  loss = "categorical_crossentropy", # Tiene que ser categórico, tenemos 5 clases
+  optimizer = optimizer_rmsprop(lr = 1e-4),
+  metrics = c("categorical_accuracy")
+)
+
+# Entrenamiento
+history <- model %>% 
+  fit_generator(
+    train_data,
+    steps_per_epoch = 100,
+    epochs = 15,
+    validation_data = validation_data,
+    validation_steps = 100
+  )
+
+# Evaluar modelo
+puntuacion <- model %>% evaluate_generator(test_data, steps = 220)
+
+# $loss
+# [1] 1.454917
+# 
+# $categorical_accuracy
+# [1] 0.2892931
+
+# Visualizar entrenamiento
+plot(history)
+
+```
 
 
 /*************************************************************************************************/
